@@ -1,0 +1,3 @@
+function startQuiz() {
+    alert("The self-assessment quiz is coming soon!");
+}
