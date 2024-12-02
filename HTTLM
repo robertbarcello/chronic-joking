@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chronic Joking Support</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Find Your Balance: Humor and Healthy Conversations</h1>
+            <nav>
+                <ul>
+                    <li><a href="#about">About</a></li>
+                    <li><a href="#self-assessment">Self-Assessment</a></li>
+                    <li><a href="#resources">Resources</a></li>
+                    <li><a href="#strategies">Strategies</a></li>
+                    <li><a href="#community">Community</a></li>
+                    <li><a href="#contact">Contact</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <section id="about" class="section">
+        <div class="container">
+            <h2>Understanding Chronic Joking</h2>
+            <p>Learn about the causes, impacts, and ways to manage chronic joking behaviors.</p>
+        </div>
+    </section>
+
+    <section id="self-assessment" class="section">
+        <div class="container">
+            <h2>Self-Assessment</h2>
+            <p>Take a quiz to better understand your habits and receive personalized tips.</p>
+            <button onclick="startQuiz()">Start Assessment</button>
+        </div>
+    </section>
+
+    <section id="resources" class="section">
+        <div class="container">
+            <h2>Resources</h2>
+            <p>Browse articles, videos, and tools to improve your communication skills.</p>
+        </div>
+    </section>
+
+    <section id="strategies" class="section">
+        <div class="container">
+            <h2>Strategies for Change</h2>
+            <p>Explore actionable strategies for self-improvement and building better conversations.</p>
+        </div>
+    </section>
+
+    <section id="community" class="section">
+        <div class="container">
+            <h2>Community Forum</h2>
+            <p>Join discussions and connect with others who share similar experiences.</p>
+        </div>
+    </section>
+
+    <footer id="contact">
+        <div class="container">
+            <h2>Contact Us</h2>
+            <p>Email us at support@chronicjokinghelp.com for more information.</p>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
