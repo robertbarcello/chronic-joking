@@ -315,6 +315,7 @@ def norm_sleep(sl):
         "nap": sl.get("nap"),
         "start": sl.get("start"),
         "end": sl.get("end"),
+        "timezone_offset": sl.get("timezone_offset"),
         "score_state": sl.get("score_state"),
         "sleep_performance_percentage": s.get("sleep_performance_percentage"),
         "sleep_efficiency_percentage": r1(s.get("sleep_efficiency_percentage")),
@@ -342,6 +343,7 @@ def norm_workout(w):
         "date": local_date(w["start"], w.get("timezone_offset")),
         "start": w.get("start"),
         "end": w.get("end"),
+        "timezone_offset": w.get("timezone_offset"),
         "duration": ms_to_hm((parse_ts(w["end"]) - parse_ts(w["start"])).total_seconds() * 1000)
         if w.get("end") else None,
         "sport_name": w.get("sport_name"),

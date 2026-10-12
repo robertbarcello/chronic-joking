@@ -1,0 +1,732 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WHOOP Health Dashboard</title>
+<style>
+:root {
+  color-scheme: dark;
+  --page: #0d0d0d;
+  --card: #1a1a19;
+  --card-2: #212120;
+  --border: rgba(255,255,255,0.08);
+  --grid: #2c2c2a;
+  --axis: #383835;
+  --ink: #f0efec;
+  --ink-2: #c3c2b7;
+  --muted: #898781;
+  --accent: #3987e5;
+  --good: #0ca30c;
+  --warn: #fab219;
+  --bad: #d03b3b;
+  --bad-text: #e66767;
+  --deep: #3987e5;
+  --rem: #d95926;
+  --light: #199e70;
+  --awake: #c98500;
+  --font: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; background: var(--page); color: var(--ink); font-family: var(--font); }
+body { -webkit-font-smoothing: antialiased; }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 32px 24px 64px; }
+@media (max-width: 640px) { .wrap { padding: 20px 16px 48px; } }
+
+header.top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 28px; }
+h1 { font-size: 26px; font-weight: 650; letter-spacing: -0.02em; margin: 0; }
+.sub { color: var(--muted); font-size: 13px; margin-top: 6px; line-height: 1.5; }
+.meta { color: var(--ink-2); font-size: 13px; text-align: right; line-height: 1.6; }
+.meta b { color: var(--ink); font-weight: 600; }
+
+h2 { font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 44px 0 14px; }
+h3 { font-size: 16px; font-weight: 600; margin: 0 0 4px; letter-spacing: -0.01em; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 20px; min-width: 0; }
+.note { color: var(--muted); font-size: 12.5px; line-height: 1.55; }
+
+/* tiles */
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 14px; }
+@media (max-width: 980px) { .tiles { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+.tile { position: relative; overflow: hidden; }
+.tile .label { font-size: 13px; color: var(--ink-2); display: flex; justify-content: space-between; gap: 8px; }
+.tile .label .when { color: var(--muted); font-size: 11.5px; }
+.tile .value { font-size: 44px; font-weight: 650; letter-spacing: -0.03em; margin: 10px 0 8px; line-height: 1; }
+.tile .value small { font-size: 16px; font-weight: 500; color: var(--ink-2); margin-left: 4px; letter-spacing: 0; }
+.tile .delta { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+.tile .base { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.tile.hero { background: linear-gradient(160deg, #1f1f1e 0%, #171716 100%); }
+.zone { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; color: var(--ink-2); }
+.zone i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.up-good, .down-good { color: var(--good); }
+.up-bad, .down-bad { color: var(--bad-text); }
+.flat { color: var(--muted); }
+
+/* charts */
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 14px; }
+@media (max-width: 860px) { .grid2 { grid-template-columns: minmax(0,1fr); } }
+.chart-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+.chart-head .now { font-size: 13px; color: var(--ink-2); }
+.chart-head .now b { color: var(--ink); font-weight: 600; }
+.chart { position: relative; width: 100%; }
+.chart svg { display: block; width: 100%; overflow: visible; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--ink-2); margin-top: 10px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.key-line { width: 14px; height: 2px; border-radius: 2px; display: inline-block; }
+.key-band { width: 14px; height: 10px; border-radius: 3px; display: inline-block; background: rgba(137,135,129,0.18); }
+.key-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.key-sq { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+
+#tip { position: fixed; pointer-events: none; z-index: 10; background: #262625; border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 9px 11px; font-size: 12.5px; line-height: 1.5; color: var(--ink); box-shadow: 0 8px 24px rgba(0,0,0,0.45); opacity: 0; transition: opacity .08s; max-width: 260px; }
+#tip .t { color: var(--muted); font-size: 11.5px; margin-bottom: 2px; }
+#tip .r { display: flex; justify-content: space-between; gap: 14px; }
+#tip .r span:first-child { color: var(--ink-2); display: inline-flex; align-items: center; gap: 6px; }
+
+/* stage mix */
+.mix { display: flex; height: 14px; border-radius: 4px; overflow: hidden; gap: 2px; margin: 14px 0 10px; }
+.mix div { height: 100%; }
+.mix-legend { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; }
+@media (max-width: 640px) { .mix-legend { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+.mix-legend .k { font-size: 12px; color: var(--ink-2); display: flex; align-items: center; gap: 6px; }
+.mix-legend .v { font-size: 20px; font-weight: 600; margin-top: 4px; }
+.mix-legend .p { font-size: 12px; color: var(--muted); }
+
+/* insights */
+.insights { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 14px; }
+@media (max-width: 1000px) { .insights { grid-template-columns: minmax(0,1fr); } }
+.rank { list-style: none; margin: 14px 0 0; padding: 0; counter-reset: r; }
+.rank li { counter-increment: r; display: grid; grid-template-columns: 26px minmax(0,1fr); gap: 10px; padding: 13px 0; border-top: 1px solid var(--grid); }
+.rank li:first-child { border-top: 0; }
+.rank li::before { content: counter(r); width: 22px; height: 22px; border-radius: 50%; background: var(--card-2); border: 1px solid var(--border); color: var(--ink-2); font-size: 11.5px; font-weight: 600; display: grid; place-items: center; }
+.rank .what { font-size: 14px; color: var(--ink); line-height: 1.35; }
+.rank .eff { font-size: 15px; font-weight: 650; margin-top: 4px; }
+.rank .ev { font-size: 12px; color: var(--muted); margin-top: 3px; line-height: 1.45; }
+.bar { height: 4px; background: var(--card-2); border-radius: 4px; margin-top: 8px; overflow: hidden; }
+.bar div { height: 100%; border-radius: 4px; }
+.chip { display: inline-block; font-size: 10.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 7px; border-radius: 999px; border: 1px solid var(--border); color: var(--ink-2); margin-left: 6px; vertical-align: 2px; }
+.chip.clear { color: var(--ink); border-color: rgba(255,255,255,0.22); }
+.thin { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--grid); }
+.thin summary { cursor: pointer; font-size: 12.5px; color: var(--ink-2); }
+.thin ul { margin: 8px 0 0; padding-left: 18px; font-size: 12px; color: var(--muted); line-height: 1.6; }
+
+.strain-grid { display: grid; grid-template-columns: minmax(0,1.6fr) minmax(0,1fr); gap: 20px; align-items: start; }
+@media (max-width: 860px) { .strain-grid { grid-template-columns: minmax(0,1fr); } }
+.big { font-size: 34px; font-weight: 650; letter-spacing: -0.02em; margin: 6px 0 4px; }
+table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+th, td { text-align: left; padding: 7px 6px; border-top: 1px solid var(--grid); }
+th { color: var(--muted); font-weight: 500; border-top: 0; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+tr.sweet td { background: rgba(12,163,12,0.08); }
+
+.flags { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; margin-top: 14px; }
+@media (max-width: 860px) { .flags { grid-template-columns: minmax(0,1fr); } }
+.flag { background: var(--card-2); border: 1px solid var(--border); border-radius: 12px; padding: 13px 14px; }
+.flag .m { font-size: 13px; color: var(--ink-2); display: flex; justify-content: space-between; gap: 8px; }
+.flag .d { font-size: 18px; font-weight: 650; margin: 6px 0 2px; }
+.flag .e { font-size: 12px; color: var(--muted); line-height: 1.45; }
+.flag.worse { border-color: rgba(208,59,59,0.45); }
+
+.recs { display: grid; gap: 12px; margin-top: 4px; }
+.rec { display: grid; grid-template-columns: 48px minmax(0,1fr) auto; gap: 16px; align-items: center; background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 18px 20px; }
+@media (max-width: 640px) { .rec { grid-template-columns: 36px minmax(0,1fr); } .rec .gain { grid-column: 2; text-align: left; } }
+.rec .n { width: 40px; height: 40px; border-radius: 12px; background: var(--accent); color: #fff; font-weight: 700; font-size: 18px; display: grid; place-items: center; }
+.rec .a { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+.rec .w { font-size: 13px; color: var(--ink-2); margin-top: 5px; line-height: 1.5; }
+.rec .gain { text-align: right; }
+.rec .gain b { display: block; font-size: 24px; font-weight: 650; color: var(--good); }
+.rec .gain span { font-size: 11.5px; color: var(--muted); }
+
+.banner { background: rgba(250,178,25,0.08); border: 1px solid rgba(250,178,25,0.35); color: var(--ink); border-radius: 12px; padding: 12px 14px; font-size: 13px; line-height: 1.5; margin-bottom: 18px; }
+.banner b { color: var(--warn); }
+
+#loader { min-height: 70vh; display: grid; place-items: center; }
+#drop { border: 1.5px dashed rgba(255,255,255,0.18); border-radius: 18px; padding: 48px 32px; text-align: center; max-width: 520px; background: var(--card); }
+#drop.over { border-color: var(--accent); background: #1d2430; }
+#drop h1 { margin-bottom: 10px; }
+#drop p { color: var(--ink-2); font-size: 14px; line-height: 1.6; }
+#drop label { display: inline-block; margin-top: 14px; background: var(--accent); color: #fff; padding: 10px 18px; border-radius: 10px; font-weight: 600; font-size: 14px; cursor: pointer; }
+#drop input { display: none; }
+#err { color: var(--bad-text); font-size: 13px; margin-top: 12px; }
+footer { margin-top: 48px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+</style>
+</head>
+<body>
+<div id="tip"></div>
+<div class="wrap">
+  <div id="loader">
+    <div id="drop">
+      <h1>WHOOP dashboard</h1>
+      <p>Drop your <b>whoop_data.json</b> here (the file <code>whoop_sync.py</code> writes), or pick it below. Everything is computed locally in this page; nothing is uploaded.</p>
+      <label>Choose whoop_data.json<input type="file" id="file" accept=".json,application/json"></label>
+      <div id="err"></div>
+    </div>
+  </div>
+  <div id="app" hidden></div>
+</div>
+
+<script>
+// build_dashboard.py replaces the next line with your data to make a single self-contained file.
+const EMBEDDED_DATA = /*__WHOOP_DATA__*/null;
+</script>
+<script>
+"use strict";
+// ============================================================ helpers
+const $ = (s, el = document) => el.querySelector(s);
+const nn = v => v !== null && v !== undefined && !Number.isNaN(v);
+const mean = a => { a = a.filter(nn); return a.length ? a.reduce((x, y) => x + y, 0) / a.length : null; };
+const sd = a => { a = a.filter(nn); if (a.length < 2) return null; const m = mean(a); return Math.sqrt(a.reduce((s, x) => s + (x - m) ** 2, 0) / (a.length - 1)); };
+const quantile = (a, q) => { a = a.filter(nn).sort((x, y) => x - y); if (!a.length) return null; const p = (a.length - 1) * q, lo = Math.floor(p), hi = Math.ceil(p); return a[lo] + (a[hi] - a[lo]) * (p - lo); };
+const median = a => quantile(a, 0.5);
+function welch(a, b) {
+  a = a.filter(nn); b = b.filter(nn);
+  if (a.length < 2 || b.length < 2) return 0;
+  const se = Math.sqrt((sd(a) ** 2) / a.length + (sd(b) ** 2) / b.length);
+  return se ? (mean(a) - mean(b)) / se : 0;
+}
+function pearson(xs, ys) {
+  const n = xs.length; if (n < 3) return null;
+  const mx = mean(xs), my = mean(ys); let sxy = 0, sxx = 0, syy = 0;
+  for (let i = 0; i < n; i++) { sxy += (xs[i] - mx) * (ys[i] - my); sxx += (xs[i] - mx) ** 2; syy += (ys[i] - my) ** 2; }
+  return sxx && syy ? sxy / Math.sqrt(sxx * syy) : null;
+}
+const addDays = (iso, n) => new Date(Date.parse(iso + "T00:00:00Z") + n * 864e5).toISOString().slice(0, 10);
+const daysBetween = (a, b) => Math.round((Date.parse(b + "T00:00:00Z") - Date.parse(a + "T00:00:00Z")) / 864e5);
+const fmtDate = iso => new Date(iso + "T00:00:00Z").toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
+const fmtDateY = iso => new Date(iso + "T00:00:00Z").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+function fmtH(h) { if (!nn(h)) return "–"; const m = Math.round(h * 60); return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m`; }
+function fmtMin(min) { if (!nn(min)) return "–"; const a = Math.abs(Math.round(min)); return a >= 60 ? `${Math.floor(a / 60)}h ${String(a % 60).padStart(2, "0")}m` : `${a} min`; }
+// Bedtime is stored as minutes after noon (so 23:30 = 690, 00:30 = 750) to keep night-time ordering sane.
+function fmtClock(minAfterNoon) { const m = ((Math.round(minAfterNoon) + 720) % 1440 + 1440) % 1440; let h = Math.floor(m / 60); const mm = String(m % 60).padStart(2, "0"); const ap = h >= 12 ? "pm" : "am"; h = h % 12 || 12; return `${h}:${mm}${ap}`; }
+function offsetMin(off) { if (!off) return null; const s = off[0] === "-" ? -1 : 1; const [h, m] = off.replace(/^[+-]/, "").split(":"); return s * (parseInt(h) * 60 + parseInt(m || 0)); }
+function localMinuteOfDay(iso, off) {
+  if (!iso) return null;
+  const o = offsetMin(off);
+  if (o === null) { const d = new Date(iso); return d.getHours() * 60 + d.getMinutes(); }
+  const d = new Date(Date.parse(iso) + o * 6e4); return d.getUTCHours() * 60 + d.getUTCMinutes();
+}
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+// ============================================================ tooltip
+const tip = $("#tip");
+function showTip(html, ev) {
+  tip.innerHTML = html; tip.style.opacity = 1;
+  const r = tip.getBoundingClientRect(); let x = ev.clientX + 14, y = ev.clientY + 14;
+  if (x + r.width > innerWidth - 8) x = ev.clientX - r.width - 14;
+  if (y + r.height > innerHeight - 8) y = ev.clientY - r.height - 14;
+  tip.style.left = x + "px"; tip.style.top = y + "px";
+}
+const hideTip = () => { tip.style.opacity = 0; };
+
+// ============================================================ metrics
+const METRICS = [
+  { k: "recovery", label: "Recovery", unit: "%", dir: 1, dp: 0, suffix: "%" },
+  { k: "hrv", label: "HRV", unit: "ms", dir: 1, dp: 0, suffix: " ms" },
+  { k: "rhr", label: "Resting HR", unit: "bpm", dir: -1, dp: 0, suffix: " bpm" },
+  { k: "sleepPerf", label: "Sleep performance", unit: "%", dir: 1, dp: 0, suffix: "%" },
+  { k: "asleep", label: "Hours slept", unit: "h", dir: 1, hours: true },
+  { k: "strain", label: "Day strain", unit: "", dir: 0, dp: 1, suffix: "" },
+  { k: "spo2", label: "SpO₂", unit: "%", dir: 1, dp: 1, suffix: "%" },
+  { k: "rr", label: "Respiratory rate", unit: "rpm", dir: -1, dp: 1, suffix: " rpm" },
+];
+const fmtV = (m, v) => !nn(v) ? "–" : m.hours ? fmtH(v) : v.toFixed(m.dp) + m.suffix;
+const fmtDelta = (m, d) => m.hours ? (d >= 0 ? "+" : "−") + fmtMin(Math.abs(d) * 60) : (d >= 0 ? "+" : "−") + Math.abs(d).toFixed(m.dp === 0 ? 0 : 1) + (m.unit === "%" ? " pts" : m.unit ? " " + m.unit : "");
+
+function buildRows(D) {
+  const keys = Object.keys(D.days || {}).sort();
+  return keys.map(k => {
+    const d = D.days[k], c = d.cycle || {}, r = d.recovery || {}, s = d.sleep || {}, st = s.stages || {};
+    const h = x => x && nn(x.hours) ? x.hours : null;
+    const off = c.timezone_offset;
+    let bed = null;
+    if (s.start) { const m = localMinuteOfDay(s.start, s.timezone_offset || off); bed = ((m - 720) % 1440 + 1440) % 1440; }
+    return {
+      date: k, off,
+      recovery: r.recovery_score ?? null, hrv: r.hrv_rmssd_ms ?? null, rhr: r.resting_heart_rate ?? null,
+      spo2: r.spo2_percentage ?? null, skin: r.skin_temp_celsius ?? null,
+      sleepPerf: s.sleep_performance_percentage ?? null, sleepEff: s.sleep_efficiency_percentage ?? null,
+      sleepCons: s.sleep_consistency_percentage ?? null, rr: s.respiratory_rate ?? null,
+      asleep: h(st.asleep), deep: h(st.deep), rem: h(st.rem), light: h(st.light), awake: h(st.awake), inBed: h(st.in_bed),
+      disturb: st.disturbance_count ?? null,
+      strain: c.strain ?? null, cal: c.calories ?? null,
+      workouts: d.workouts || [], naps: d.naps || [], bed,
+    };
+  });
+}
+
+// trailing 30-day baseline (mean, sd) for each row, excluding the row itself
+function trailing(rows, key, win = 30, minN = 7) {
+  return rows.map((r, i) => {
+    const vals = [];
+    for (let j = i - 1; j >= 0 && daysBetween(rows[j].date, r.date) <= win; j--) if (nn(rows[j][key])) vals.push(rows[j][key]);
+    return vals.length >= minN ? { m: mean(vals), s: sd(vals), n: vals.length } : null;
+  });
+}
+
+// ============================================================ render: header + tiles
+function renderHeader(D, rows) {
+  const g = D.gaps || {}, w = D.window || {};
+  const gapList = (g.no_cycle || []);
+  const runs = []; // collapse consecutive gap days into ranges
+  gapList.slice().sort().forEach(d => { const l = runs[runs.length - 1]; if (l && daysBetween(l[1], d) === 1) l[1] = d; else runs.push([d, d]); });
+  const gapTxt = runs.length ? runs.slice(0, 6).map(([a, b]) => a === b ? fmtDate(a) : `${fmtDate(a)}–${fmtDate(b)}`).join(", ") + (runs.length > 6 ? ` +${runs.length - 6} more` : "") : "none";
+  const name = D.profile && D.profile.first_name ? `${esc(D.profile.first_name)}'s` : "Your";
+  return `<header class="top">
+    <div><h1>${name} WHOOP</h1>
+      <div class="sub">${rows.length ? `${fmtDateY(rows[0].date)} – ${fmtDateY(rows[rows.length - 1].date)}` : ""} · ${rows.length} days with data of ${w.days_requested ?? "?"} requested · days missing: ${gapTxt}</div></div>
+    <div class="meta">Generated <b>${D.generated_at ? new Date(D.generated_at).toLocaleString() : "–"}</b>${D.missing_scopes && D.missing_scopes.length ? `<br><span style="color:var(--bad-text)">Missing scopes: ${D.missing_scopes.map(esc).join(", ")}</span>` : ""}</div>
+  </header>`;
+}
+
+function latestOf(rows, k) { for (let i = rows.length - 1; i >= 0; i--) if (nn(rows[i][k])) return i; return -1; }
+
+function renderTiles(rows) {
+  const lastDate = rows[rows.length - 1].date;
+  return `<div class="tiles">` + METRICS.map((m, idx) => {
+    const i = latestOf(rows, m.k);
+    if (i < 0) return `<div class="card tile"><div class="label">${m.label}</div><div class="value">–</div><div class="base">No data</div></div>`;
+    const v = rows[i][m.k];
+    const base = mean(rows.filter(r => { const d = daysBetween(r.date, rows[i].date); return d >= 1 && d <= 30; }).map(r => r[m.k]));
+    let delta = "";
+    if (nn(base) && base !== 0) {
+      const diff = v - base, pct = diff / Math.abs(base) * 100;
+      const flat = Math.abs(pct) < 2;
+      const arrow = flat ? "≈" : diff > 0 ? "▲" : "▼";
+      const cls = flat || m.dir === 0 ? "flat" : (diff > 0) === (m.dir > 0) ? (diff > 0 ? "up-good" : "down-good") : (diff > 0 ? "up-bad" : "down-bad");
+      const word = flat ? "in line with baseline" : (m.dir === 0 ? "" : (diff > 0) === (m.dir > 0) ? "better" : "worse");
+      delta = `<div class="delta ${cls}">${arrow} ${fmtDelta(m, diff)} <span style="font-weight:500">(${pct >= 0 ? "+" : "−"}${Math.abs(pct).toFixed(0)}%)</span>${word && !flat ? ` <span style="font-weight:500;color:var(--muted)">· ${word}</span>` : ""}</div>`;
+    }
+    let zone = "";
+    if (m.k === "recovery") {
+      const z = v >= 67 ? ["Green", "var(--good)"] : v >= 34 ? ["Yellow", "var(--warn)"] : ["Red", "var(--bad)"];
+      zone = `<span class="zone"><i style="background:${z[1]}"></i>${z[0]}</span>`;
+    }
+    const when = rows[i].date === lastDate ? fmtDate(rows[i].date) : `latest: ${fmtDate(rows[i].date)}`;
+    const valHtml = m.hours ? fmtH(v).replace(/(\d+)h (\d+)m/, "$1<small>h</small> $2<small>m</small>") : `${v.toFixed(m.dp)}<small>${m.unit}</small>`;
+    return `<div class="card tile${idx === 0 ? " hero" : ""}">
+      <div class="label"><span>${m.label} ${zone}</span><span class="when">${when}</span></div>
+      <div class="value">${valHtml}</div>
+      ${delta}
+      <div class="base">30-day baseline ${nn(base) ? fmtV(m, base) : "– (need more history)"}</div>
+    </div>`;
+  }).join("") + `</div>`;
+}
+
+// ============================================================ render: trend small multiples
+function trendCard(m) {
+  return `<div class="card"><div class="chart-head"><h3>${m.label}</h3><span class="now" id="now-${m.k}"></span></div>
+    <div class="chart" id="ch-${m.k}"></div></div>`;
+}
+
+function drawTrend(el, rows, m) {
+  const W = el.clientWidth, H = 170, P = { l: 40, r: 10, t: 10, b: 24 };
+  const pts = rows.map((r, i) => ({ r, i, v: r[m.k] })).filter(p => nn(p.v));
+  if (pts.length < 2) { el.innerHTML = `<div class="note">Not enough data.</div>`; return; }
+  const base = trailing(rows, m.k);
+  const t0 = Date.parse(rows[0].date), t1 = Date.parse(rows[rows.length - 1].date);
+  const x = d => P.l + (Date.parse(d) - t0) / Math.max(1, t1 - t0) * (W - P.l - P.r);
+  let lo = Math.min(...pts.map(p => p.v)), hi = Math.max(...pts.map(p => p.v));
+  base.forEach(b => { if (b && nn(b.s)) { lo = Math.min(lo, b.m - b.s); hi = Math.max(hi, b.m + b.s); } });
+  const pad = (hi - lo) * 0.08 || 1; lo -= pad; hi += pad;
+  const y = v => P.t + (1 - (v - lo) / (hi - lo)) * (H - P.t - P.b);
+  const ticks = niceTicks(lo, hi, 4);
+  let s = `<svg width="${W}" height="${H}" role="img" aria-label="${m.label} trend">`;
+  ticks.forEach(t => { s += `<line x1="${P.l}" x2="${W - P.r}" y1="${y(t)}" y2="${y(t)}" stroke="var(--grid)" stroke-width="1"/><text x="${P.l - 8}" y="${y(t) + 4}" fill="var(--muted)" font-size="11" text-anchor="end" style="font-variant-numeric:tabular-nums">${m.hours ? t.toFixed(t % 1 ? 1 : 0) + "h" : +t.toFixed(2)}</text>`; });
+  monthTicks(rows[0].date, rows[rows.length - 1].date).forEach(d => { s += `<text x="${x(d)}" y="${H - 6}" fill="var(--muted)" font-size="11" text-anchor="middle">${new Date(d + "T00:00:00Z").toLocaleDateString(undefined, { month: "short", timeZone: "UTC" })}</text>`; });
+  // baseline band + line (break into segments where baseline is missing)
+  let band = [], segs = [], cur = [];
+  rows.forEach((r, i) => { const b = base[i]; if (b && nn(b.s)) { cur.push([x(r.date), b]); } else if (cur.length) { segs.push(cur); cur = []; } });
+  if (cur.length) segs.push(cur);
+  segs.forEach(sg => {
+    const up = sg.map(([px, b]) => `${px},${y(b.m + b.s)}`), dn = sg.slice().reverse().map(([px, b]) => `${px},${y(b.m - b.s)}`);
+    s += `<polygon points="${up.concat(dn).join(" ")}" fill="rgba(137,135,129,0.16)"/>`;
+    s += `<polyline points="${sg.map(([px, b]) => `${px},${y(b.m)}`).join(" ")}" fill="none" stroke="var(--muted)" stroke-width="1.5" stroke-linejoin="round"/>`;
+  });
+  // value line, broken across gaps > 2 days
+  let path = "", prev = null;
+  pts.forEach(p => { const cmd = prev && daysBetween(prev.r.date, p.r.date) <= 2 ? "L" : "M"; path += `${cmd}${x(p.r.date).toFixed(1)},${y(p.v).toFixed(1)}`; prev = p; });
+  const color = m.dir === 0 ? "var(--ink-2)" : "var(--accent)";
+  s += `<path d="${path}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+  // breakouts: beyond ±1 SD of trailing baseline
+  pts.forEach(p => {
+    const b = base[p.i]; if (!b || !nn(b.s) || Math.abs(p.v - b.m) <= b.s) return;
+    const good = m.dir === 0 ? null : (p.v > b.m) === (m.dir > 0);
+    const fill = good === null ? "var(--ink-2)" : good ? "var(--good)" : "var(--bad)";
+    s += `<circle cx="${x(p.r.date)}" cy="${y(p.v)}" r="3.5" fill="${fill}" stroke="var(--card)" stroke-width="2"/>`;
+  });
+  s += `<line class="xh" x1="0" x2="0" y1="${P.t}" y2="${H - P.b}" stroke="var(--axis)" stroke-width="1" visibility="hidden"/><circle class="hd" r="4.5" fill="${color}" stroke="var(--card)" stroke-width="2" visibility="hidden"/>`;
+  s += `<rect x="${P.l}" y="0" width="${W - P.l - P.r}" height="${H}" fill="transparent"/></svg>`;
+  el.innerHTML = s;
+  const svg = el.querySelector("svg"), xh = svg.querySelector(".xh"), hd = svg.querySelector(".hd");
+  svg.addEventListener("mousemove", ev => {
+    const bx = ev.clientX - svg.getBoundingClientRect().left;
+    let best = pts[0]; for (const p of pts) if (Math.abs(x(p.r.date) - bx) < Math.abs(x(best.r.date) - bx)) best = p;
+    const px = x(best.r.date), b = base[best.i];
+    xh.setAttribute("x1", px); xh.setAttribute("x2", px); xh.setAttribute("visibility", "visible");
+    hd.setAttribute("cx", px); hd.setAttribute("cy", y(best.v)); hd.setAttribute("visibility", "visible");
+    let rel = "";
+    if (b && nn(b.s)) { const z = (best.v - b.m) / (b.s || 1); rel = Math.abs(z) > 1 ? (z > 0 ? "above" : "below") + " normal range" : "within normal range"; }
+    showTip(`<div class="t">${fmtDateY(best.r.date)}</div><div class="r"><span>${m.label}</span><b>${fmtV(m, best.v)}</b></div>${b ? `<div class="r"><span>30-day baseline</span><span>${fmtV(m, b.m)}</span></div><div class="r"><span>Status</span><span>${rel}</span></div>` : `<div class="r"><span>Baseline</span><span>building…</span></div>`}`, ev);
+  });
+  svg.addEventListener("mouseleave", () => { xh.setAttribute("visibility", "hidden"); hd.setAttribute("visibility", "hidden"); hideTip(); });
+  const breaks = pts.filter(p => { const b = base[p.i]; return b && nn(b.s) && Math.abs(p.v - b.m) > b.s; }).length;
+  const withBase = pts.filter(p => base[p.i] && nn(base[p.i].s)).length;
+  $(`#now-${m.k}`).innerHTML = `avg <b>${fmtV(m, mean(pts.map(p => p.v)))}</b> · ${breaks}/${withBase} days outside baseline`;
+}
+
+function niceTicks(lo, hi, n) {
+  const span = hi - lo, step0 = span / n, mag = 10 ** Math.floor(Math.log10(step0));
+  const step = [1, 2, 2.5, 5, 10].map(f => f * mag).find(s => s >= step0) || mag * 10;
+  const out = []; for (let t = Math.ceil(lo / step) * step; t <= hi + 1e-9; t += step) out.push(+t.toFixed(6));
+  return out;
+}
+function monthTicks(a, b) {
+  const out = []; let d = new Date(a + "T00:00:00Z"); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() + 1);
+  while (d.toISOString().slice(0, 10) <= b) { out.push(d.toISOString().slice(0, 10)); d.setUTCMonth(d.getUTCMonth() + 1); }
+  return out.length > 7 ? out.filter((_, i) => i % 2 === 0) : out;
+}
+
+// ============================================================ render: sleep stages
+const STAGES = [["deep", "Deep (SWS)", "var(--deep)"], ["rem", "REM", "var(--rem)"], ["light", "Light", "var(--light)"], ["awake", "Awake", "var(--awake)"]];
+
+function renderStagesShell(rows) {
+  const nights = rows.filter(r => nn(r.deep));
+  const avg = Object.fromEntries(STAGES.map(([k]) => [k, mean(nights.map(r => r[k]))]));
+  const tot = STAGES.reduce((s, [k]) => s + (avg[k] || 0), 0) || 1;
+  const recent = nights.filter(r => daysBetween(r.date, rows[rows.length - 1].date) < 30);
+  const prior = nights.filter(r => { const d = daysBetween(r.date, rows[rows.length - 1].date); return d >= 30 && d < 60; });
+  return `<div class="card">
+    <div class="chart-head"><h3>Sleep stages per night</h3><span class="now">${nights.length} nights · avg asleep <b>${fmtH(mean(nights.map(r => r.asleep)))}</b></span></div>
+    <div class="mix">${STAGES.map(([k, , c]) => `<div style="flex:${(avg[k] || 0) / tot};background:${c}" title="${k}"></div>`).join("")}</div>
+    <div class="mix-legend">${STAGES.map(([k, l, c]) => {
+      const r30 = mean(recent.map(r => r[k])), p30 = mean(prior.map(r => r[k]));
+      const ch = nn(r30) && nn(p30) && recent.length >= 10 && prior.length >= 10 ? ` · last 30d ${r30 >= p30 ? "+" : "−"}${fmtMin(Math.abs(r30 - p30) * 60)}` : "";
+      return `<div><div class="k"><i class="key-sq" style="background:${c}"></i>${l}</div><div class="v">${fmtH(avg[k])}</div><div class="p">${((avg[k] || 0) / tot * 100).toFixed(0)}% of time in bed${ch}</div></div>`;
+    }).join("")}</div>
+    <div class="chart" id="ch-stages" style="margin-top:18px"></div>
+  </div>`;
+}
+
+function drawStages(el, rows) {
+  const nights = rows.filter(r => nn(r.deep));
+  if (!nights.length) { el.innerHTML = `<div class="note">No scored sleep.</div>`; return; }
+  const W = el.clientWidth, H = 200, P = { l: 40, r: 10, t: 8, b: 24 };
+  const t0 = Date.parse(rows[0].date), t1 = Date.parse(rows[rows.length - 1].date);
+  const span = daysBetween(rows[0].date, rows[rows.length - 1].date) + 1;
+  const slot = (W - P.l - P.r) / span, gap = slot >= 4 ? 1 : 0, bw = Math.max(1, Math.min(24, slot - gap));
+  const x = d => P.l + daysBetween(rows[0].date, d) * slot + (slot - bw) / 2;
+  const maxH = Math.max(...nights.map(r => STAGES.reduce((s, [k]) => s + (r[k] || 0), 0)));
+  const hi = Math.ceil(maxH);
+  const y = v => P.t + (1 - v / hi) * (H - P.t - P.b);
+  let s = `<svg width="${W}" height="${H}" role="img" aria-label="Sleep stages per night">`;
+  for (let t = 0; t <= hi; t += hi > 8 ? 2 : 2) s += `<line x1="${P.l}" x2="${W - P.r}" y1="${y(t)}" y2="${y(t)}" stroke="var(--grid)"/><text x="${P.l - 8}" y="${y(t) + 4}" fill="var(--muted)" font-size="11" text-anchor="end">${t}h</text>`;
+  monthTicks(rows[0].date, rows[rows.length - 1].date).forEach(d => { s += `<text x="${x(d) + bw / 2}" y="${H - 6}" fill="var(--muted)" font-size="11" text-anchor="middle">${new Date(d + "T00:00:00Z").toLocaleDateString(undefined, { month: "short", timeZone: "UTC" })}</text>`; });
+  nights.forEach(r => {
+    let acc = 0; const segGap = bw >= 3 ? 1 : 0;
+    STAGES.forEach(([k, , c], si) => {
+      const v = r[k] || 0; if (!v) return;
+      const y0 = y(acc), y1 = y(acc + v); acc += v;
+      s += `<rect x="${x(r.date).toFixed(1)}" y="${(y1 + (si ? 0 : 0)).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0, y0 - y1 - segGap).toFixed(1)}" fill="${c}" ${si === 3 ? 'rx="1"' : ""}/>`;
+    });
+    s += `<rect class="hit" data-d="${r.date}" x="${(x(r.date) - gap / 2).toFixed(1)}" y="${P.t}" width="${slot.toFixed(1)}" height="${H - P.t - P.b}" fill="transparent"/>`;
+  });
+  s += `</svg>`;
+  el.innerHTML = s + `<div class="legend">${STAGES.map(([, l, c]) => `<span><i class="key-sq" style="background:${c}"></i>${l}</span>`).join("")}</div>`;
+  const by = Object.fromEntries(nights.map(r => [r.date, r]));
+  el.querySelectorAll(".hit").forEach(h => {
+    h.addEventListener("mousemove", ev => { const r = by[h.dataset.d]; showTip(`<div class="t">Night before ${fmtDateY(r.date)}</div>${STAGES.map(([k, l, c]) => `<div class="r"><span><i class="key-sq" style="background:${c}"></i>${l}</span><b>${fmtH(r[k])}</b></div>`).join("")}<div class="r"><span>Disturbances</span><span>${r.disturb ?? "–"}</span></div>`, ev); h.setAttribute("fill", "rgba(255,255,255,0.05)"); });
+    h.addEventListener("mouseleave", () => { hideTip(); h.setAttribute("fill", "transparent"); });
+  });
+}
+
+// ============================================================ analysis
+const MIN_N = 8;          // each side of a comparison needs at least this many days
+const T_CLEAR = 2.0;      // |t| >= 2  -> "clear"
+const T_TENT = 1.3;       // 1.3..2   -> "tentative"; below -> no real difference
+
+function analyse(D, rows) {
+  const by = Object.fromEntries(rows.map(r => [r.date, r]));
+  const prev = r => by[addDays(r.date, -1)];
+  const workoutsOk = !(D.missing_scopes || []).includes("read:workout");
+  const allWorkouts = rows.flatMap(r => r.workouts);
+  const woStrainQ75 = quantile(allWorkouts.map(w => w.strain), 0.75);
+  const strainQ75 = quantile(rows.map(r => r.strain), 0.75);
+  const medBed = median(rows.map(r => r.bed));
+  const woHour = (w, r) => { const m = localMinuteOfDay(w.start, w.timezone_offset || r.off); return m === null ? null : m / 60; };
+  const woDur = w => w.duration && nn(w.duration.hours) ? w.duration.hours : 0;
+
+  // Each feature describes the day BEFORE a recovery (P) or the night that produced it (D's sleep).
+  const F = [];
+  const add = (id, group, label, test, needWorkouts) => { if (!needWorkouts || workoutsOk) F.push({ id, group, label, test }); };
+  add("late_workout", "wo_time", "Working out after 7pm", (D, P) => P ? P.workouts.some(w => woHour(w, P) >= 19) : null, true);
+  add("morning_workout", "wo_time", "Working out before noon", (D, P) => P ? P.workouts.some(w => woHour(w, P) < 12) : null, true);
+  add("rest_day", "load", "A full rest day (no logged workout)", (D, P) => P ? P.workouts.length === 0 : null, true);
+  add("two_a_day", "load", "Two or more workouts in a day", (D, P) => P ? P.workouts.length >= 2 : null, true);
+  add("long_workout", "load", "90+ minutes of training in a day", (D, P) => P ? P.workouts.reduce((s, w) => s + woDur(w), 0) >= 1.5 : null, true);
+  if (nn(woStrainQ75)) add("hard_workout", "load", `A hard session (workout strain ≥ ${woStrainQ75.toFixed(1)}, your top 25%)`, (D, P) => P ? P.workouts.some(w => nn(w.strain) && w.strain >= woStrainQ75) : null, true);
+  if (nn(strainQ75)) {
+    add("high_strain", "load", `A high-strain day (≥ ${strainQ75.toFixed(1)}, your top 25%)`, (D, P) => P && nn(P.strain) ? P.strain >= strainQ75 : null);
+    add("back_to_back", "load", `Two high-strain days in a row (≥ ${strainQ75.toFixed(1)})`, (D, P) => { const PP = P && prev(P); return P && PP && nn(P.strain) && nn(PP.strain) ? P.strain >= strainQ75 && PP.strain >= strainQ75 : null; });
+  }
+  if (nn(medBed)) {
+    add("late_bed", "bed", `Bedtime 45+ min later than your usual ${fmtClock(medBed)} (after ${fmtClock(medBed + 45)})`, (D) => nn(D.bed) ? D.bed >= medBed + 45 : null);
+    add("early_bed", "bed", `Bedtime by ${fmtClock(medBed - 30)} (30+ min earlier than usual)`, (D) => nn(D.bed) ? D.bed <= medBed - 30 : null);
+  }
+  add("irregular_bed", "consistency", "Bedtime shifting 60+ min from the night before", (D, P) => P && nn(D.bed) && nn(P.bed) ? Math.abs(D.bed - P.bed) >= 60 : null);
+  add("short_sleep", "duration", "Under 7h asleep", (D) => nn(D.asleep) ? D.asleep < 7 : null);
+  add("long_sleep", "duration", "8h+ asleep", (D) => nn(D.asleep) ? D.asleep >= 8 : null);
+  add("nap", "nap", "Napping the day before", (D, P) => P ? P.naps.length > 0 : null);
+
+  // Strain → next-day recovery
+  const pairs = rows.map(r => { const P = prev(r); return P && nn(P.strain) && nn(r.recovery) ? { s: P.strain, rec: r.recovery, date: r.date } : null; }).filter(Boolean);
+  const strain = strainAnalysis(pairs);
+  if (strain.sweet) add("above_sweet", "load", `Day strain above your sweet spot (> ${strain.sweet[1]})`, (D, P) => P && nn(P.strain) ? P.strain > strain.sweet[1] : null);
+
+  const compare = (f, outKey) => {
+    const yes = [], no = [];
+    rows.forEach(r => { const v = r[outKey]; if (!nn(v)) return; const t = f.test(r, prev(r)); if (t === true) yes.push(v); else if (t === false) no.push(v); });
+    const n1 = yes.length, n2 = no.length;
+    const res = { f, n1, n2, m1: mean(yes), m2: mean(no) };
+    if (n1 < MIN_N || n2 < MIN_N) return { ...res, status: "thin" };
+    const t = welch(yes, no), diff = res.m1 - res.m2;
+    return { ...res, t, diff, rel: res.m2 ? diff / Math.abs(res.m2) * 100 : 0, freq: n1 / (n1 + n2), status: Math.abs(t) >= T_CLEAR ? "clear" : Math.abs(t) >= T_TENT ? "tentative" : "none" };
+  };
+  const results = {};
+  for (const out of ["recovery", "deep", "hrv"]) results[out] = F.map(f => compare(f, out));
+
+  // Last 30 vs previous 30
+  const last = rows[rows.length - 1].date;
+  const TREND = [
+    ["recovery", "Recovery", 1], ["hrv", "HRV", 1], ["rhr", "Resting HR", -1], ["sleepPerf", "Sleep performance", 1],
+    ["asleep", "Hours slept", 1], ["deep", "Deep sleep", 1], ["rem", "REM sleep", 1], ["spo2", "SpO₂", 1],
+    ["rr", "Respiratory rate", -1], ["sleepCons", "Sleep consistency", 1], ["disturb", "Sleep disturbances", -1], ["strain", "Day strain", 0],
+  ];
+  const trends = TREND.map(([k, label, dir]) => {
+    const a = rows.filter(r => daysBetween(r.date, last) < 30).map(r => r[k]).filter(nn);
+    const b = rows.filter(r => { const d = daysBetween(r.date, last); return d >= 30 && d < 60; }).map(r => r[k]).filter(nn);
+    if (a.length < 10 || b.length < 10) return { k, label, dir, status: "thin", na: a.length, nb: b.length };
+    const t = welch(a, b), diff = mean(a) - mean(b);
+    const wrong = dir !== 0 && Math.sign(diff) === -dir;
+    const sig = Math.abs(t) >= T_CLEAR ? "clear" : Math.abs(t) >= T_TENT ? "tentative" : "none";
+    return { k, label, dir, a: mean(a), b: mean(b), diff, rel: mean(b) ? diff / Math.abs(mean(b)) * 100 : 0, na: a.length, nb: b.length, t, sig, wrong };
+  });
+
+  return { results, strain, trends, pairsN: pairs.length, medBed };
+}
+
+function strainAnalysis(pairs) {
+  const out = { n: pairs.length, r: null, bins: [], sweet: null, overall: mean(pairs.map(p => p.rec)) };
+  if (pairs.length < 3) return out;
+  out.r = pearson(pairs.map(p => p.s), pairs.map(p => p.rec));
+  const edges = [0, 8, 10, 12, 14, 16, 18, 21.1];
+  for (let i = 0; i < edges.length - 1; i++) {
+    const ps = pairs.filter(p => p.s >= edges[i] && p.s < edges[i + 1]);
+    out.bins.push({ lo: edges[i], hi: Math.min(21, edges[i + 1]), n: ps.length, m: mean(ps.map(p => p.rec)) });
+  }
+  if (pairs.length >= 20) {
+    // Sweet spot: the highest-strain band (n >= 5) whose next-day recovery holds at or above your overall
+    // average (within 2 pts), widened one band lower if that band also qualifies.
+    const ok = out.bins.map(b => b.n >= 5 && nn(b.m) && b.m >= out.overall - 2);
+    let top = -1; ok.forEach((v, i) => { if (v) top = i; });
+    if (top >= 0) {
+      const lo = top > 0 && ok[top - 1] ? top - 1 : top;
+      out.sweet = [out.bins[lo].lo, out.bins[top].hi === 21 ? 21 : out.bins[top].hi];
+      out.sweetIdx = [lo, top];
+      const above = pairs.filter(p => p.s > out.sweet[1]);
+      out.above = { n: above.length, m: mean(above.map(p => p.rec)) };
+      const inside = pairs.filter(p => p.s >= out.sweet[0] && p.s <= out.sweet[1]);
+      out.inside = { n: inside.length, m: mean(inside.map(p => p.rec)) };
+    }
+  }
+  return out;
+}
+
+// ============================================================ render: insights
+const OUT = {
+  recovery: { name: "recovery", fmt: d => `${d >= 0 ? "+" : "−"}${Math.abs(d).toFixed(0)} pts`, val: v => v.toFixed(0) + "%" },
+  deep: { name: "deep sleep", fmt: d => `${d >= 0 ? "+" : "−"}${fmtMin(Math.abs(d) * 60)}`, val: v => fmtH(v) },
+  hrv: { name: "HRV", fmt: d => `${d >= 0 ? "+" : "−"}${Math.abs(d).toFixed(1)} ms`, val: v => v.toFixed(0) + " ms" },
+};
+
+function rankList(list, out, sign, empty) {
+  const o = OUT[out];
+  const items = list.filter(r => (r.status === "clear" || r.status === "tentative") && Math.sign(r.diff) === sign)
+    .sort((a, b) => sign * (b.diff - a.diff));
+  const maxAbs = Math.max(...items.map(r => Math.abs(r.diff)), 1e-9);
+  const color = sign > 0 ? "var(--good)" : "var(--bad)";
+  let html = items.length ? `<ol class="rank">${items.map(r => `<li><div>
+      <div class="what">${esc(r.f.label)}<span class="chip ${r.status}">${r.status === "clear" ? "clear" : "tentative"}</span></div>
+      <div class="eff ${sign > 0 ? "up-good" : "down-bad"}">${o.fmt(r.diff)} ${o.name} <span style="font-weight:500;color:var(--ink-2)">(${r.rel >= 0 ? "+" : "−"}${Math.abs(r.rel).toFixed(0)}%)</span></div>
+      <div class="ev">${o.val(r.m1)} vs ${o.val(r.m2)} otherwise · based on ${r.n1} days (vs ${r.n2} without)</div>
+      <div class="bar"><div style="width:${(Math.abs(r.diff) / maxAbs * 100).toFixed(0)}%;background:${color}"></div></div>
+    </div></li>`).join("")}</ol>` : `<p class="note" style="margin-top:14px">${empty}</p>`;
+  const thin = list.filter(r => r.status === "thin");
+  const none = list.filter(r => r.status === "none");
+  html += `<details class="thin"><summary>${none.length} tested with no real difference · ${thin.length} too thin to call</summary><ul>
+    ${none.map(r => `<li>${esc(r.f.label)}: ${o.fmt(r.diff)} — within noise (${r.n1} vs ${r.n2} days)</li>`).join("")}
+    ${thin.map(r => `<li>${esc(r.f.label)}: only ${r.n1} day${r.n1 === 1 ? "" : "s"} with / ${r.n2} without — need ${MIN_N}+ each</li>`).join("")}
+  </ul></details>`;
+  return html;
+}
+
+function renderInsights(A) {
+  const { results } = A;
+  return `<div class="insights">
+    <div class="card"><h3>What hurts your recovery</h3><div class="note">Average recovery the morning after each behaviour vs mornings without it. Worst first.</div>
+      ${rankList(results.recovery, "recovery", -1, "Nothing in your data clearly drags recovery down yet.")}</div>
+    <div class="card"><h3>What lifts your deep sleep</h3><div class="note">Average slow-wave sleep on nights following each behaviour vs other nights.</div>
+      ${rankList(results.deep, "deep", 1, "No behaviour clearly raises your deep sleep yet.")}</div>
+    <div class="card"><h3>What lifts your HRV</h3><div class="note">Average overnight HRV (RMSSD) after each behaviour vs without.</div>
+      ${rankList(results.hrv, "hrv", 1, "No behaviour clearly raises your HRV yet.")}</div>
+  </div>
+  <p class="note" style="margin-top:12px">"Clear" = the gap is about twice its own noise (Welch t ≥ 2); "tentative" = t 1.3–2, worth watching but not proven. A behaviour needs ${MIN_N}+ days on each side before it's ranked. These are correlations in your own history, not proof of cause: late workouts and late bedtimes often travel together, for example.</p>`;
+}
+
+function renderStrain(A) {
+  const S = A.strain;
+  if (S.n < 20) return `<div class="card"><h3>Day strain vs next-day recovery</h3><p class="note">Only ${S.n} strain→next-morning pairs. Need at least 20 to say anything about an optimal range.</p></div>`;
+  const rTxt = S.r === null ? "–" : S.r.toFixed(2);
+  const strength = S.r === null ? "" : Math.abs(S.r) < 0.1 ? "essentially no linear link" : Math.abs(S.r) < 0.3 ? "a weak link" : Math.abs(S.r) < 0.5 ? "a moderate link" : "a strong link";
+  let head;
+  if (S.sweet) {
+    head = `<div class="note">Your personal optimal strain</div><div class="big">${S.sweet[0]}–${S.sweet[1]}</div>
+      <div class="w note" style="font-size:13px;color:var(--ink-2);line-height:1.55">The highest load you carry while next-morning recovery stays at or above your average (${S.overall.toFixed(0)}%). Days in this range: next-day recovery ${S.inside.m.toFixed(0)}% (${S.inside.n} days).
+      ${S.above.n >= 5 ? `Above ${S.sweet[1]}: it drops to <b style="color:var(--bad-text)">${S.above.m.toFixed(0)}%</b> (${S.above.n} days).` : S.above.n ? `Only ${S.above.n} day${S.above.n === 1 ? "" : "s"} above ${S.sweet[1]}, too few to say what happens beyond it.` : `You never went above ${S.sweet[1]}, so the ceiling is untested.`}</div>`;
+  } else head = `<div class="note">Optimal range</div><div class="big">Not clear</div><div class="note">No strain band has 5+ days with next-day recovery at or above your average.</div>`;
+  return `<div class="card"><h3>Day strain vs next-day recovery</h3>
+    <div class="note">${S.n} day pairs · correlation r = ${rTxt} (${strength}${S.r !== null && Math.abs(S.r) >= 0.1 ? (S.r < 0 ? ": harder days → lower recovery" : ": harder days → higher recovery") : ""})</div>
+    <div class="strain-grid" style="margin-top:14px">
+      <div><div class="chart" id="ch-strainrec"></div>
+        <div class="legend"><span><i class="key-dot" style="background:var(--accent)"></i>One day → next morning</span><span><i class="key-line" style="background:var(--ink)"></i>Band average</span><span><i class="key-band" style="background:rgba(12,163,12,0.16)"></i>Sweet spot</span></div></div>
+      <div>${head}
+        <table style="margin-top:14px"><thead><tr><th>Strain</th><th class="num">Next-day rec.</th><th class="num">Days</th></tr></thead><tbody>
+        ${S.bins.map((b, i) => `<tr class="${S.sweetIdx && i >= S.sweetIdx[0] && i <= S.sweetIdx[1] ? "sweet" : ""}"><td>${b.lo === 0 ? "<8" : b.hi === 21 ? `${b.lo}+` : `${b.lo}–${b.hi}`}</td><td class="num">${b.n ? b.m.toFixed(0) + "%" : "–"}${b.n && b.n < 5 ? " <span class='note'>(thin)</span>" : ""}</td><td class="num">${b.n}</td></tr>`).join("")}
+        </tbody></table></div>
+    </div></div>`;
+}
+
+function drawStrain(el, A, rows) {
+  const S = A.strain; if (!el || S.n < 20) return;
+  const by = Object.fromEntries(rows.map(r => [r.date, r]));
+  const pairs = rows.map(r => { const P = by[addDays(r.date, -1)]; return P && nn(P.strain) && nn(r.recovery) ? { s: P.strain, rec: r.recovery, date: r.date } : null; }).filter(Boolean);
+  const W = el.clientWidth, H = 260, P = { l: 40, r: 10, t: 10, b: 30 };
+  const x = v => P.l + v / 21 * (W - P.l - P.r), y = v => P.t + (1 - v / 100) * (H - P.t - P.b);
+  let s = `<svg width="${W}" height="${H}" role="img" aria-label="Strain vs next-day recovery">`;
+  if (S.sweet) s += `<rect x="${x(S.sweet[0])}" y="${P.t}" width="${x(S.sweet[1]) - x(S.sweet[0])}" height="${H - P.t - P.b}" fill="rgba(12,163,12,0.12)"/>`;
+  [0, 25, 50, 75, 100].forEach(t => { s += `<line x1="${P.l}" x2="${W - P.r}" y1="${y(t)}" y2="${y(t)}" stroke="var(--grid)"/><text x="${P.l - 8}" y="${y(t) + 4}" fill="var(--muted)" font-size="11" text-anchor="end">${t}%</text>`; });
+  [0, 3, 6, 9, 12, 15, 18, 21].forEach(t => { s += `<text x="${x(t)}" y="${H - 12}" fill="var(--muted)" font-size="11" text-anchor="middle">${t}</text>`; });
+  s += `<text x="${W - P.r}" y="${H}" fill="var(--muted)" font-size="11" text-anchor="end">day strain →</text>`;
+  pairs.forEach(p => { s += `<circle class="pt" data-d="${p.date}" cx="${x(p.s)}" cy="${y(p.rec)}" r="4" fill="var(--accent)" fill-opacity="0.75" stroke="var(--card)" stroke-width="1.5"/>`; });
+  S.bins.forEach(b => { if (b.n >= 3) s += `<line x1="${x(b.lo) + 3}" x2="${x(b.hi) - 3}" y1="${y(b.m)}" y2="${y(b.m)}" stroke="var(--ink)" stroke-width="2.5" stroke-linecap="round"/>`; });
+  s += `</svg>`;
+  el.innerHTML = s;
+  const pm = Object.fromEntries(pairs.map(p => [p.date, p]));
+  el.querySelectorAll(".pt").forEach(c => {
+    c.addEventListener("mousemove", ev => { const p = pm[c.dataset.d]; showTip(`<div class="t">${fmtDateY(addDays(p.date, -1))} → ${fmtDate(p.date)}</div><div class="r"><span>Day strain</span><b>${p.s.toFixed(1)}</b></div><div class="r"><span>Next-day recovery</span><b>${p.rec.toFixed(0)}%</b></div>`, ev); c.setAttribute("r", 6); });
+    c.addEventListener("mouseleave", () => { hideTip(); c.setAttribute("r", 4); });
+  });
+}
+
+function renderTrendFlags(A) {
+  const T = A.trends;
+  const fmtT = (t, v) => ["asleep", "deep", "rem"].includes(t.k) ? fmtH(v) : t.k === "disturb" ? v.toFixed(1) : t.k === "strain" || t.k === "spo2" || t.k === "rr" ? v.toFixed(1) : v.toFixed(0);
+  const fmtD = (t, d) => ["asleep", "deep", "rem"].includes(t.k) ? (d >= 0 ? "+" : "−") + fmtMin(Math.abs(d) * 60) : (d >= 0 ? "+" : "−") + Math.abs(d).toFixed(t.k === "spo2" || t.k === "rr" || t.k === "strain" || t.k === "disturb" ? 1 : 0);
+  const worse = T.filter(t => t.status !== "thin" && t.wrong && t.sig !== "none").sort((a, b) => Math.abs(b.t) - Math.abs(a.t));
+  const better = T.filter(t => t.status !== "thin" && !t.wrong && t.dir !== 0 && t.sig !== "none");
+  const steady = T.filter(t => t.status !== "thin" && (t.sig === "none" || t.dir === 0) && !worse.includes(t));
+  const thin = T.filter(t => t.status === "thin");
+  const card = (t, cls) => `<div class="flag ${cls}"><div class="m"><span>${t.label}</span><span class="chip ${t.sig}">${cls === "worse" ? (t.sig === "clear" ? "worsening" : "drifting") : t.sig === "clear" ? "improving" : "slightly better"}</span></div>
+    <div class="d ${cls === "worse" ? "down-bad" : "up-good"}">${t.diff > 0 ? "▲" : "▼"} ${fmtD(t, t.diff)} <span style="font-size:13px;font-weight:500;color:var(--ink-2)">(${t.rel >= 0 ? "+" : "−"}${Math.abs(t.rel).toFixed(0)}%)</span></div>
+    <div class="e">${fmtT(t, t.a)} last 30 days vs ${fmtT(t, t.b)} the 30 before · ${t.na} vs ${t.nb} days</div></div>`;
+  return `<div class="card"><h3>Trending the wrong way</h3><div class="note">Last 30 days vs the 30 days before. Flagged only when the shift is bigger than day-to-day noise (t ≥ ${T_TENT}).</div>
+    ${worse.length ? `<div class="flags">${worse.map(t => card(t, "worse")).join("")}</div>` : `<p class="note" style="margin-top:14px;color:var(--ink-2)">Nothing is clearly moving the wrong way. Good.</p>`}
+    ${better.length ? `<div class="note" style="margin-top:16px">Moving the right way:</div><div class="flags">${better.map(t => card(t, "better")).join("")}</div>` : ""}
+    <p class="note" style="margin-top:14px">Steady: ${steady.map(t => t.label).join(", ") || "–"}.${thin.length ? ` Too little data to compare: ${thin.map(t => `${t.label} (${t.na}/${t.nb} days)`).join(", ")}.` : ""}</p></div>`;
+}
+
+const ACTIONS = {
+  late_workout: { hurt: "Finish workouts before 7pm" },
+  morning_workout: { help: "Train before noon when you can", hurt: "Move training out of the early morning" },
+  rest_day: { help: "Schedule more full rest days", hurt: "Swap full rest days for light active recovery" },
+  two_a_day: { hurt: "Cap it at one workout a day" },
+  long_workout: { hurt: "Keep daily training under 90 minutes" },
+  hard_workout: { hurt: "Follow every hard session with an easy day" },
+  high_strain: { hurt: "Treat your top-25% strain days as the exception" },
+  back_to_back: { hurt: "Never stack two high-strain days" },
+  above_sweet: { hurt: "Keep day strain inside your sweet spot" },
+  late_bed: { hurt: "Hold a bedtime cut-off" },
+  early_bed: { help: "Get to bed earlier" },
+  irregular_bed: { hurt: "Keep bedtime within an hour, night to night" },
+  short_sleep: { hurt: "Protect at least 7 hours asleep" },
+  long_sleep: { help: "Aim for 8 hours asleep" },
+  nap: { hurt: "Skip daytime naps", help: "Take a short daytime nap" },
+};
+
+function renderRecs(A) {
+  const cands = A.results.recovery.filter(r => r.status === "clear" || r.status === "tentative").map(r => {
+    const hurt = r.diff < 0;
+    const act = (ACTIONS[r.f.id] || {})[hurt ? "hurt" : "help"];
+    if (!act) return null;
+    // Gain to your 180-day average recovery if this were changed on every eligible day.
+    const gain = hurt ? -r.diff * r.freq : r.diff * (1 - r.freq);
+    return { r, hurt, act, gain };
+  }).filter(Boolean).sort((a, b) => b.gain - a.gain);
+  const picked = [], groups = new Set();
+  for (const c of cands) { if (groups.has(c.r.f.group)) continue; picked.push(c); groups.add(c.r.f.group); if (picked.length === 3) break; }
+  if (!picked.length) return `<div class="card"><p class="note" style="color:var(--ink-2)">Your data doesn't yet show any behaviour with a reliable effect on recovery, so there's nothing honest to recommend. Keep wearing the strap and log more workouts; re-run in a month.</p></div>`;
+  const out = picked.map((c, i) => {
+    const r = c.r, pct = (r.freq * 100).toFixed(0);
+    const why = c.hurt
+      ? `${esc(r.f.label)} on ${r.n1} of ${r.n1 + r.n2} days (${pct}%). Those mornings averaged <b>${r.m1.toFixed(0)}%</b> recovery vs <b>${r.m2.toFixed(0)}%</b> otherwise.`
+      : `${esc(r.f.label)}: only ${r.n1} of ${r.n1 + r.n2} days (${pct}%). Those mornings averaged <b>${r.m1.toFixed(0)}%</b> recovery vs <b>${r.m2.toFixed(0)}%</b> otherwise.`;
+    const extra = r.f.id === "late_bed" ? ` Aim to be asleep by ${fmtClock(A.medBed + 45)}.` : r.f.id === "early_bed" ? ` Target ${fmtClock(A.medBed - 30)}.` : r.f.id === "above_sweet" && A.strain.sweet ? ` Target ${A.strain.sweet[0]}–${A.strain.sweet[1]}.` : "";
+    return `<div class="rec"><div class="n">${i + 1}</div><div><div class="a">${c.act}${r.status === "tentative" ? '<span class="chip">tentative</span>' : ""}</div><div class="w">${why}${extra}</div></div>
+      <div class="gain"><b>+${c.gain.toFixed(1)}</b><span>pts avg recovery<br>(+${Math.abs(r.diff).toFixed(0)} on affected days)</span></div></div>`;
+  }).join("");
+  const short = picked.length < 3 ? `<p class="note" style="margin-top:10px">Only ${picked.length} change${picked.length === 1 ? "" : "s"} clear${picked.length === 1 ? "s" : ""} the evidence bar; the rest of your behaviours either show no real effect or have too few days to judge.</p>` : "";
+  return `<div class="recs">${out}</div>${short}<p class="note" style="margin-top:10px">Ranked by expected lift to your overall average: the size of the effect × how often you could change it. One per theme, so the three don't overlap.</p>`;
+}
+
+// ============================================================ main
+function render(D) {
+  const rows = buildRows(D);
+  if (!rows.length) throw new Error("This file has no days in it.");
+  const A = analyse(D, rows);
+  const recDays = rows.filter(r => nn(r.recovery)).length;
+  const banner = recDays < 45 ? `<div class="banner"><b>Thin data:</b> only ${recDays} days with a recovery score. Rankings below will mostly read "too thin to call" until you have ~2 months.</div>` : "";
+  const synth = D.SYNTHETIC ? `<div class="banner"><b>Synthetic demo data</b> — not a real person's WHOOP history.</div>` : "";
+  $("#app").innerHTML = synth + renderHeader(D, rows) + banner +
+    `<h2>Today</h2>` + renderTiles(rows) +
+    `<h2>Trends vs your baseline</h2>
+     <div class="legend" style="margin:-4px 0 12px"><span><i class="key-line" style="background:var(--accent)"></i>Daily value</span><span><i class="key-line" style="background:var(--muted)"></i>Trailing 30-day baseline</span><span><i class="key-band"></i>Normal range (±1 SD)</span><span><i class="key-dot" style="background:var(--good)"></i>Broke out, good direction</span><span><i class="key-dot" style="background:var(--bad)"></i>Broke out, bad direction</span></div>
+     <div class="grid2">${METRICS.map(trendCard).join("")}</div>
+     <div style="margin-top:14px">${renderStagesShell(rows)}</div>` +
+    `<h2>What drives your recovery</h2>` + renderInsights(A) +
+    `<div style="margin-top:14px">${renderStrain(A)}</div>` +
+    `<div style="margin-top:14px">${renderTrendFlags(A)}</div>` +
+    `<h2>Your 3 highest-impact changes</h2>` + renderRecs(A) +
+    `<footer>Day = the day you wake into: each WHOOP cycle starts at sleep onset, so a day's recovery and sleep come from the night before it, and its strain is what you did after waking. Behaviours are matched to the next morning's recovery. Built from whoop_data.json; nothing leaves this page.</footer>`;
+  $("#loader").hidden = true; $("#app").hidden = false;
+  const draw = () => {
+    METRICS.forEach(m => drawTrend($(`#ch-${m.k}`), rows, m));
+    drawStages($("#ch-stages"), rows);
+    drawStrain($("#ch-strainrec"), A, rows);
+  };
+  draw();
+  let rt; addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(draw, 120); });
+}
+
+function load(text) {
+  try { const D = JSON.parse(text); if (!D || !D.days) throw new Error("That doesn't look like whoop_data.json (no \"days\" key)."); render(D); }
+  catch (e) { $("#err").textContent = e.message; }
+}
+if (EMBEDDED_DATA) render(EMBEDDED_DATA);
+else {
+  const drop = $("#drop");
+  $("#file").addEventListener("change", e => { const f = e.target.files[0]; if (f) f.text().then(load); });
+  ["dragenter", "dragover"].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave", "drop"].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove("over"); }));
+  drop.addEventListener("drop", e => { const f = e.dataTransfer.files[0]; if (f) f.text().then(load); });
+}
+</script>
+</body>
+</html>
