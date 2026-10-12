@@ -3,3 +3,6 @@ whoop_tokens.json
 whoop_tokens.json.tmp
 whoop_data.json
 .env
+
+__pycache__/
+*.pyc
