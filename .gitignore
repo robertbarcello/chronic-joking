@@ -1,0 +1,4 @@
+.whoop_tokens.json
+whoop_data.json
+.env
+__pycache__/
