@@ -1,0 +1,5 @@
+# WHOOP OAuth tokens and pulled health data - never commit
+whoop_tokens.json
+whoop_tokens.json.tmp
+whoop_data.json
+.env
